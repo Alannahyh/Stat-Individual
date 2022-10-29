@@ -9,18 +9,47 @@
 #penalty given above.
 #ngrid – the number of smoothing parameter values to try. You should use even 
 #spacing of values on the log scale.
+
+library(MASS)
+x<-mcycle$times
+y<-mcycle$accel
+
+
 pspline<- function(x,y,k,logsp,bord,pord,ngrid){
   
   dk <- diff(range(x))/(k-bord) ## knot spacing
   knots <- seq(min(x)-dk*bord,by=dk,length=k+bord+1)
   X <- splines::splineDesign(knots,x,ord=bord+1,outer.ok=TRUE)
   D <- diff(diag(k),differences=pord)
-  print(x)
-  print(X[,1])
-  plot(x,X[,1])
+  #print(D)
+  #print('hi')
+  #print(X)
+  #here Q is the orthogonal matrix we use to find the lambdas
+  qrx<-qr(X)
+  print(qrx)
+  #print(eigen(qr.Q(qrx)))
+  #p<-ncol(X)
+  
+  #beta <- backsolve(qr.R(qrx),qr.qty(qrx,y)[1:p])
+  #print(beta)
+  #Q<-qr.Q(qrx)
+  #
+  #print(qrx)
+  #eig<-eigen(Q)
+  #print(eig)
+  #plot(x,X[,1])
+  #plot(x,X[,2])
+  #plot(x,X[,3])
+  #plot(x,X[,4])
+  #plot(x,X[,5])
 }
 
-print(pspline(c(1,2,3,4,5,6,7,8,9,10,11,12),c(5,6,7,3,4,5,6,7,8,9,10,11,12),4,c(-5,5),3,2,100))
+#Note that the mcycle data from the MASS library provides one set of x, y 
+#(times, accel) data to try
+#rdm data
+pspline(x,y,6,c(-5,5),3,2,100)
+
+#pspline(b,b,6,c(-5,5),2,2,100)
 #to choose lambda (the smoothing parameter) we need to use some function
 #
 #sequence of log smoothing parameters - lsp
@@ -33,5 +62,3 @@ print(pspline(c(1,2,3,4,5,6,7,8,9,10,11,12),c(5,6,7,3,4,5,6,7,8,9,10,11,12),4,c(
 #print(x1)
 
 #plot(x,X)
-
-gg
