@@ -26,8 +26,12 @@ pspline<- function(x,y,k,logsp,bord,pord,ngrid){
   #print(X)
   #here Q is the orthogonal matrix we use to find the lambdas
   qrx<-qr(X)
-  print(qrx)
-  #print(eigen(qr.Q(qrx)))
+  Q<-qr.Q(qrx)
+  R<-qr.R(qrx)
+  print(Q)
+  print(R)
+  e<- eigen(R)
+  print(e)
   #p<-ncol(X)
   
   #beta <- backsolve(qr.R(qrx),qr.qty(qrx,y)[1:p])
