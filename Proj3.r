@@ -1,21 +1,9 @@
 #Alannah Hounat S2434943
 
-#x and y the vectors of x, y data to smooth
-#k – the number of basis functions to use
-#logsp – the ends of the interval over which to search for the smoothing 
-#parameter (log λ scale).
-#bord – the B-spline order to use: 3 corresponds to cubic
-#pord – the order of difference to use in the penalty. 2 is for the 
-#penalty given above.
-#ngrid – the number of smoothing parameter values to try. You should use even 
-#spacing of values on the log scale.
-
 library(MASS)
 x<-mcycle$times
 y<-mcycle$accel
 
-
-#new_x_val<-seq(min(x),max(x),1)
 
 pspline<-function(x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100) {
   
@@ -27,18 +15,23 @@ pspline<-function(x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100) {
   X <- splines::splineDesign(knots,x,ord=bord+1,outer.ok=TRUE)
   D <- diff(diag(k),differences=pord)
   
+  #finding the Qr decomposition of X
   qrx<-qr(X)
+  #finding the crossproduct of D for the b.hat formula 
   crossD<-crossprod(D)
+  #formula for b.hat
   formula.bhat<- t(solve(qr.R(qrx)))%*%crossD%*%solve(qr.R(qrx))
+  #eigen decomposition, used for finding lambda and U
+  #in finding the 
   e.decomp<-eigen(formula.bhat)
   
-  lam<-e.decomp$values
-  lambda<-diag(lam)
+  #lam<-e.decomp$values
+  #vector containing eigenvals in the diagonal
+  lambda<-diag(e.decomp$values)
+  #matrix of eigen vectors
   U<-e.decomp$vectors
   
-  ## function for ridge regression of y on X with generalized
-  ## cross validation lsp is the set of smoothing parameters to try
-  edf <- gcv <- sig <-b.hat<-fv <- lsp*0 ## vectors for edf and gcv
+  edf <- gcv <- sig <- lsp*0 ## vectors for edf and gcv and sigma squared
   for (i in 1:length(lsp)){
     ## loop over log smoothing parameters
     fr <- get.gcv(y,X,exp(lsp[i]),D,bord,pord,qrx,lambda,U) ## fit
@@ -47,55 +40,63 @@ pspline<-function(x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100) {
     sig[i] <- fr$sig
     
   }
-  #plot.gcv(edf,lsp,gcv) ## plot results
-  i.opt <- max(which(gcv==min(gcv))) ## locate minimum
-  
-  get.gcv(y,X,exp(lsp[i.opt]),D,bord,pord,qrx,lambda,U)## return fit at minimum
+  #find the optimum value for gcv
+  i.opt <- max(which(gcv==min(gcv))) 
+  get.gcv(y,X,exp(lsp[i.opt]),D,bord,pord,qrx,lambda,U)
   val<-get.gcv(y,X,exp(lsp[i.opt]),D,bord,pord,qrx,lambda,U)
-  #print(fv[i.opt])
-  #print(b.hat[i.opt])
-  #print(sig[i.opt])
+  class(val)<-"pspline"
+  return(val)
 }
-#fit.ridge
+
+
 get.gcv <- function (y,X,sp,D,bord,pord,qrx,lambda,U){
+  #number of rows and colums of matrix X
   p <- ncol(X);n <- nrow(X)
-  ## Compute hat matrix.
-  #t(D)%*%D same as crossprod(D)
   
+  #A is the matrix (I+λΛ)^-1
   A<-solve(diag(p)+sp*lambda)
+  #effective degree of freedom of the model
   trA <- sum(diag(A)) 
-  #print(length(trA))## Effective degrees of fredom
-  ## compute coeff estimates.
-  
-  
+
+  # computing coeff estimates,b.hat.
   b.hat<-backsolve(qr.R(qrx),U%*%solve(diag(p)+lambda*sp)%*%t(U)%*% qr.qty(qrx,y)[1:p])
-  fv <- X %*% b.hat ## fitted values
-  
-  sig<-sum((y-fv)^2)/(n-trA)
+  #mu.hat(fitted values)
+  mu.hat <- X %*% b.hat 
+  #sigma squared 
+  sig<-sum((y-mu.hat)^2)/(n-trA)
   
   res<-sqrt(sig)
   V<-solve(t(X)%*%X+sp*t(D)%*%D)*sig
-  se2<-rowSums(X*(X%*%V))^0.5
-  sm<-c()
-  
-  #print(b.hat)
+  #standard error 
+  stan_error<-rowSums(X*(X%*%V))^0.5
+  #generalized cross validation
+  #gcv is used to help us find the most optimal value for λ 
   gcv <- sig/(n-trA)
-  
+  #empty vector for holding the values of y[i]-mean(y)
+  sm<-c()
+  #takes the elements of the y vector and subtracts mean(y)
+  #this is needed for the formula of r squared
   for(elem in 1:n){
     values<-(y[elem]-mean(y))^2
     sm<-c(sm,values)
     
   }
+  #summing up the values of y[i]-mean(y)
+  #which needed to be unlisted prior to summation
   sum.a<-sum(unlist(sm))
+  ##??
   r_sq<-1-((n-1)*sig)/sum.a
   
-  list(b.hat=b.hat,fv=fv,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res, bord=bord,pord=pord,V=V,X=X,D=D,sp=sp)
-  vals<-list(b.hat=b.hat,fv=fv,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res, bord=bord,pord=pord,V=V,X=X,D=D,sp=sp)
-  #class(list(b.hat=b.hat,mu.hat=fv,sig=sig))<-"pspline"
+  list(b.hat=b.hat,mu.hat=mu.hat,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res,bord=bord,pord=pord,V=V,X=X,D=D,sp=sp)
+  vals<-list(b.hat=b.hat,mu.hat=mu.hat,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res, bord=bord,pord=pord,V=V,X=X,D=D,sp=sp)
+  #class(list(b.hat=b.hat,mu.hat=mu.hat,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res, bord=bord,pord=pord,V=V,X=X,D=D,sp=sp))<-"pspline"
+  #return(vals)
 }
 
-
-
+#INPUT
+#OUTPUT
+#PURPOSE:takes in the values produced by pspline and returns 
+#
 print.pspline<- function(m){
   cat('Order of' ,m$bord, 'p-spline with order',m$pord, 'penalty',"\n")
   cat('Effective degrees of freedom:',m$edf,' ')
@@ -106,13 +107,12 @@ print.pspline<- function(m){
   lists<-list(gcv=m$gcv,edf=m$edf,r_sq=m$r_sq)
   invisible(lists)
 }
-
-
+#
+new_x_val<-seq(min(x),max(x),by=1)
 
 predict.pspline<- function(m,x,se=TRUE){
   
-  
-  new_x_val<-seq(min(x),max(x),by=1)
+
   bord<-3
   k<-20
   dk <- diff(range(new_x_val))/(k-bord) ## knot spacing
@@ -136,25 +136,25 @@ predict.pspline<- function(m,x,se=TRUE){
 plot.pspline<-function(m){
   #plot 1
   plot(x,y,xlab='x',ylab='mu.hat')
-  lines(x,m$fv)
-  #print(m$fv)
+  lines(x,m$mu.hat)
+  #print(m$mu.hat)
   
   V<-solve(t(m$X)%*%m$X+m$sp*t(m$D)%*%m$D)*m$sig
   
-  se2<-rowSums(m$X*(m$X%*%m$V))^0.5
+  stan_error<-rowSums(m$X*(m$X%*%m$V))^0.5
   
-  upperbound<-c(m$fv+1.96*sqrt(m$sig))
-  lowerbound<-c(m$fv-1.96*sqrt(m$sig))
+  upperbound<-c(m$mu.hat+1.96*sqrt(m$sig))
+  lowerbound<-c(m$mu.hat-1.96*sqrt(m$sig))
   lines(x,upperbound,lty=2)
   lines(x,lowerbound,lty=2)
   resid<-c()
   
   for(elem in 1:length(y)){
-    values2<-(y[elem]-m$fv[elem])
+    values2<-(y[elem]-m$mu.hat[elem])
     resid<-c(resid,values2)
     
   }
-  plot(m$fv,resid,xlab='mu',ylab='residulas')
+  plot(m$mu.hat,resid,xlab='mu',ylab='residulas')
   
   qqnorm(resid,xlab='residuals',ylab='residuals')
   
