@@ -117,7 +117,7 @@ predict.pspline<- function(m,x,se=TRUE){
   k<-20
   dk <- diff(range(new_x_val))/(k-bord) ## knot spacing
   knots <- seq(min(new_x_val)-dk*bord,by=dk,length=k+bord+1)
-  Xp <- splines::splineDesign(knots,new_x_val,ord=bord+1,outer.ok=TRUE)
+  Xp <- splines::splineDesign(knots,new_x_val,bord=bord+1,outer.ok=TRUE)
   
   if(se==TRUE){
     pred_y<-Xp%*%m$b.hat
