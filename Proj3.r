@@ -1,9 +1,21 @@
 #Alannah Hounat S2434943
 
+#"Smoothing with basis expansions and penalties"
+#P-Splines are regression splines used to smooth data. This is done by fitting
+#them by least-squares and a roughness penalty.
+#In this code we will be:
+#-> Smoothing data x,y with generalised cross validation
+# smoothing parameter selection using the pspline function
+#-> Reporting details of the model fit using the print.pspline function
+#-> Creating new x data and finding new predictions based off these using the 
+# predict.pspline function
+#-> Plotting: 1. the original x,y data with 95% confidence intervals for the data
+#2. the model residuals vs the fitted values
+#3. a qqplot of the residuals, all using the plot.pspline function
+
 library(MASS)
 x<-mcycle$times
 y<-mcycle$accel
-
 
 pspline<-function(x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100) {
   
@@ -21,11 +33,9 @@ pspline<-function(x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100) {
   crossD<-crossprod(D)
   #formula for b.hat
   formula.bhat<- t(solve(qr.R(qrx)))%*%crossD%*%solve(qr.R(qrx))
-  #eigen decomposition, used for finding lambda and U
-  #in finding the 
+  #eigen decomposition, used for finding lambda(matrix of eigenvalues on diagonal)
+  #and U (matrix of eigen vectors)
   e.decomp<-eigen(formula.bhat)
-  
-  #lam<-e.decomp$values
   #vector containing eigenvals in the diagonal
   lambda<-diag(e.decomp$values)
   #matrix of eigen vectors
@@ -34,10 +44,10 @@ pspline<-function(x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100) {
   edf <- gcv <- sig <- lsp*0 ## vectors for edf and gcv and sigma squared
   for (i in 1:length(lsp)){
     ## loop over log smoothing parameters
-    fr <- get.gcv(y,X,exp(lsp[i]),D,bord,pord,qrx,lambda,U) ## fit
-    gcv[i] <- fr$gcv
-    edf[i] <- fr$edf
-    sig[i] <- fr$sig
+    gg <- get.gcv(y,X,exp(lsp[i]),D,bord,pord,qrx,lambda,U) ## fit
+    gcv[i] <- gg$gcv
+    edf[i] <- gg$edf
+    sig[i] <- gg$sig
     
   }
   #find the optimum value for gcv
@@ -62,17 +72,20 @@ get.gcv <- function (y,X,sp,D,bord,pord,qrx,lambda,U){
   b.hat<-backsolve(qr.R(qrx),U%*%solve(diag(p)+lambda*sp)%*%t(U)%*% qr.qty(qrx,y)[1:p])
   #mu.hat(fitted values)
   mu.hat <- X %*% b.hat 
-  #sigma squared 
+  #sigma squared ie residual variance
   sig<-sum((y-mu.hat)^2)/(n-trA)
-  
+  #residual standard deviation 
   res<-sqrt(sig)
+  
+  
   V<-solve(t(X)%*%X+sp*t(D)%*%D)*sig
-  #standard error 
-  stan_error<-rowSums(X*(X%*%V))^0.5
-  #generalized cross validation
+
+  
+  
+  #generalized cross validation(gcv)
   #gcv is used to help us find the most optimal value for λ 
   gcv <- sig/(n-trA)
-  #empty vector for holding the values of y[i]-mean(y)
+  #empty vector 'sm' for holding the values of y[i]-mean(y)
   sm<-c()
   #takes the elements of the y vector and subtracts mean(y)
   #this is needed for the formula of r squared
@@ -87,8 +100,8 @@ get.gcv <- function (y,X,sp,D,bord,pord,qrx,lambda,U){
   ##??
   r_sq<-1-((n-1)*sig)/sum.a
   
-  list(b.hat=b.hat,mu.hat=mu.hat,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res,bord=bord,pord=pord,V=V,X=X,D=D,sp=sp)
-  vals<-list(b.hat=b.hat,mu.hat=mu.hat,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res, bord=bord,pord=pord,V=V,X=X,D=D,sp=sp)
+  list(b.hat=b.hat,mu.hat=mu.hat,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res,bord=bord,pord=pord,X=X,D=D,V=V,sp=sp)
+  #vals<-list(b.hat=b.hat,mu.hat=mu.hat,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res, bord=bord,pord=pord,V=V,X=X,D=D,sp=sp)
   #class(list(b.hat=b.hat,mu.hat=mu.hat,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res, bord=bord,pord=pord,V=V,X=X,D=D,sp=sp))<-"pspline"
   #return(vals)
 }
@@ -107,24 +120,40 @@ print.pspline<- function(m){
   lists<-list(gcv=m$gcv,edf=m$edf,r_sq=m$r_sq)
   invisible(lists)
 }
-#
-new_x_val<-seq(min(x),max(x),by=1)
 
+#a new set of values that are within the range of the old values and the same
+#length. Simplest way for this to be done is to start by using the max and min
+#values of oldx and and find every number between these values 1 unit away
+#from eachother
+new_x<-seq(min(x),max(x),by=1)
+
+#INPUT:
+#OUTPUT:
+#PURPOSE:makes predictions for the smooth fit using new_x
 predict.pspline<- function(m,x,se=TRUE){
-  
 
-  bord<-3
-  k<-20
-  dk <- diff(range(new_x_val))/(k-bord) ## knot spacing
-  knots <- seq(min(new_x_val)-dk*bord,by=dk,length=k+bord+1)
-  Xp <- splines::splineDesign(knots,new_x_val,bord=bord+1,outer.ok=TRUE)
+  dk <- diff(range(new_x))/(m$k-m$bord) ## knot spacing
+  knots <- seq(min(new_x)-dk*m$bord,by=dk,length=m$k+m$bord+1)
+  #new model matrix for the new data suppled
+  Xp <- splines::splineDesign(knots,new_x,ord=m$bord+1,outer.ok=TRUE)
+  #covariance matrix for Xp
   
+  
+  #V<-solve(t(Xp)%*%Xp+m$sp*t(m$D)%*%m$D)*m$sig
+  
+  
+  
+  #if se=TRUE compute and return a list containg the y predictions and 
+  #standard error (se) values
   if(se==TRUE){
+    #y predictions found from multi0plying the modelmatrix by b.hat values
     pred_y<-Xp%*%m$b.hat
+    #standard error 
     se<-rowSums(Xp*(Xp%*%m$V))^0.5
     listc<-list(pred_y=pred_y,se=se)
     return(listc)
   }
+  #if se=FALSE compute and return y predictions
   else{
     pred_y<-Xp%*%m$b.hat
     return(pred_y)
@@ -134,19 +163,14 @@ predict.pspline<- function(m,x,se=TRUE){
 
 
 plot.pspline<-function(m){
-  #plot 1
-  plot(x,y,xlab='x',ylab='mu.hat')
-  lines(x,m$mu.hat)
-  #print(m$mu.hat)
-  
-  V<-solve(t(m$X)%*%m$X+m$sp*t(m$D)%*%m$D)*m$sig
-  
-  stan_error<-rowSums(m$X*(m$X%*%m$V))^0.5
+  #Plot 1:the original x,y data with 95% confidence intervals for the data
+  plot(x,y,main='Plot of original x,y data',xlab='x',ylab='mu.hat')
+  lines(x,m$mu.hat,col='red')
   
   upperbound<-c(m$mu.hat+1.96*sqrt(m$sig))
   lowerbound<-c(m$mu.hat-1.96*sqrt(m$sig))
-  lines(x,upperbound,lty=2)
-  lines(x,lowerbound,lty=2)
+  lines(x,upperbound,col='#FF33CC',lty=2)
+  lines(x,lowerbound,col='#6633CC',lty=2)
   resid<-c()
   
   for(elem in 1:length(y)){
@@ -154,7 +178,7 @@ plot.pspline<-function(m){
     resid<-c(resid,values2)
     
   }
-  plot(m$mu.hat,resid,xlab='mu',ylab='residulas')
+  plot(m$mu.hat,resid,main='',xlab='mu',ylab='residulas')
   
   qqnorm(resid,xlab='residuals',ylab='residuals')
   
