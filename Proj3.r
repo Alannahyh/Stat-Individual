@@ -89,7 +89,7 @@ get.gcv <- function (y,X,sp,D,bord,pord,qrx,lambda,U){
   #effective degree of freedom of the model
   trA <- sum(diag(A)) 
 
-  # computing coeff estimates,b.hat.
+  # computing coeff estimates,b.hat
   b.hat<-backsolve(qr.R(qrx),U%*%solve(diag(p)+lambda*sp)%*%t(U)%*% qr.qty(qrx,y)[1:p])
   
   #mu.hat(fitted values)
@@ -113,7 +113,6 @@ get.gcv <- function (y,X,sp,D,bord,pord,qrx,lambda,U){
   #standard error 
   stan_error<-rowSums(X*(X%*%V))^0.5
   
-  
   #generalized cross validation(gcv)
   #gcv is used to help us find the most optimal value for λ 
   gcv <- sig/(n-trA)
@@ -136,7 +135,8 @@ get.gcv <- function (y,X,sp,D,bord,pord,qrx,lambda,U){
   r_sq<-1-((n-1)*sig)/sum.a
   
   #list of values to call in later functions using m$
-  list(b.hat=b.hat,mu.hat=mu.hat,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res,bord=bord,pord=pord,X=X,D=D,V=V,sp=sp,stan_error=stan_error)
+  list(b.hat=b.hat,mu.hat=mu.hat,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res,
+       bord=bord,pord=pord,X=X,D=D,V=V,sp=sp,stan_error=stan_error)
 }
 
 #INPUT:m<- model fit
@@ -158,7 +158,6 @@ print.pspline<- function(m){
 #length. Simplest way for this to be done is to start by using the max and min
 #values of oldx and and find every number between these values 1 unit away
 #from eachother
-set.seed(0)
 new_x<-runif(length(x),min=min(x),max(x))
 
 #INPUT:m<- model fit ,x<- new x values,se<-standard error
@@ -175,11 +174,12 @@ predict.pspline<- function(m,x,se=TRUE){
   #if se=TRUE compute and return a list containing the y predictions and 
   #standard error (se) values
   if(se==TRUE){
-    #y predictions found from multi0plying the modelmatrix by b.hat values
+    #y predictions found from multi0plying the model matrix by b.hat values
     pred_y<-Xp%*%m$b.hat
     
     #standard error 
     se<-rowSums(Xp*(Xp%*%m$V))^0.5
+    
     #list containing predicted y values and corresponding standard errors
     listc<-list(pred_y=pred_y,se=se)
     return(listc)
@@ -221,10 +221,11 @@ plot.pspline<-function(m){
     resid<-c(resid,values2)
     
   }
-  #the model residuals vs the fitted values
-  plot(m$mu.hat,resid,main='',xlab='mu',ylab='residulas')
-  #a qqplot of the residuals
-  qqnorm(resid,xlab='residuals',ylab='residuals')
+  #Plot 2: the model residuals vs the fitted values
+  plot(m$mu.hat,resid,main='model residuals vs fitted values',xlab='mu',ylab='residulas')
+  
+  #Plot 3: qqplot of the residuals
+  qqnorm(resid)
   
   #list containing the upperbound, lowerbound and x values
   list2<-list(ll=lowerbound,ul=upperbound,x=x)
