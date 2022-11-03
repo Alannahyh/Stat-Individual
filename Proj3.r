@@ -1,8 +1,9 @@
 #Alannah Hounat S2434943
 
+#OVERVIEW
 #"Smoothing with basis expansions and penalties"
 #P-Splines are regression splines used to smooth data. This is done by fitting
-#them by least-squares and a roughness penalty.
+#them by least-squares(b.hat) and a roughness penalty.
 #In this code we will be:
 #-> Smoothing data x,y with generalised cross validation
 # smoothing parameter selection using the pspline function
@@ -14,19 +15,16 @@
 #3. a qqplot of the residuals, all using the plot.pspline function
 
 
-##elaborate whats bhat<-penalized least squares
-#muhat<- estimates of the residuals
-library(MASS)
-x<-mcycle$times
-y<-mcycle$accel
-
-
 #INPUT:x<-x data to smooth,y<-y data to smooth,k<-number of basis functions
 #logsp<-ends of interval for smoothing parameter,bord<-B-spline order,
 #pord<-order of difference to use in the penalty,
 #ngrid<-number of smoothing parameters
 #OUTPUT:a list of class pspline
-#PURPOSE:to find b.hat
+#PURPOSE:to find b.hat<-penalized least squares,
+#muhat<- estimates of the residuals
+#sig<-residual variance
+#all of which is used to find gcv<-generalized cross validation and then
+#find the optimal gcv score
 pspline<-function(x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100) {
   
   #sequence of values for smoothing parameter
@@ -72,6 +70,7 @@ pspline<-function(x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100) {
   val<-get.gcv(y,X,exp(lsp[i.opt]),D,bord,pord,qrx,lambda,U)
   class(val)<-"pspline"
   return(val)
+  print(val)
 }
 
 #INPUT: y<-values, X<-matrix,sp<-smoothing parameters,bord<-,pord<-,
@@ -131,12 +130,14 @@ get.gcv <- function (y,X,sp,D,bord,pord,qrx,lambda,U){
   #which needed to be unlisted prior to summation
   sum.a<-sum(unlist(sm))
   
-  ##??
+  #how well data fits regression model
   r_sq<-1-((n-1)*sig)/sum.a
   
   #list of values to call in later functions using m$
-  list(b.hat=b.hat,mu.hat=mu.hat,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res,
-       bord=bord,pord=pord,X=X,D=D,V=V,sp=sp,stan_error=stan_error)
+  alist<-list(b.hat=b.hat,mu.hat=mu.hat,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res,
+       bord=bord,pord=pord,X=X,V=V,sp=sp,stan_error=stan_error,knots=knots)
+  class(alist)<-"pspline"
+  return(alist)
 }
 
 #INPUT:m<- model fit
@@ -154,22 +155,17 @@ print.pspline<- function(m){
   invisible(lists)
 }
 
-#a new set of values that are within the range of the old values and the same
-#length. Simplest way for this to be done is to start by using the max and min
-#values of oldx and and find every number between these values 1 unit away
-#from eachother
-new_x<-runif(length(x),min=min(x),max(x))
 
 #INPUT:m<- model fit ,x<- new x values,se<-standard error
 #OUTPUT:if se==TRUE: list of predicted y values and corresponding standard errors
 #PURPOSE:makes predictions for the smooth fit using new_x
 predict.pspline<- function(m,x,se=TRUE){
 
-  dk <- diff(range(new_x))/(m$k-m$bord) ## knot spacing
-  knots <- seq(min(new_x)-dk*m$bord,by=dk,length=m$k+m$bord+1)
+  dk <- diff(range(x))/(m$k-m$bord) ## knot spacing
+  knots <- seq(min(x)-dk*m$bord,by=dk,length=m$k+m$bord+1)
   
-  #new model matrix for the new data suppled
-  Xp <- splines::splineDesign(knots,new_x,ord=m$bord+1,outer.ok=TRUE)
+  #new model matrix for the new data supplied
+  Xp <- splines::splineDesign(knots,x,ord=m$bord+1,outer.ok=TRUE)
   
   #if se=TRUE compute and return a list containing the y predictions and 
   #standard error (se) values
@@ -200,7 +196,6 @@ predict.pspline<- function(m,x,se=TRUE){
 #PURPOSE:takes in the values produced by pspline and returns plots as described above
 plot.pspline<-function(m){
   #Plot 1:the original x,y data with 95% confidence intervals for the data
-  #use m$x and y 
   plot(x,y,main='Plot of original x,y data',xlab='x',ylab='mu.hat')
   lines(x,m$mu.hat,col='red')
   
@@ -222,17 +217,14 @@ plot.pspline<-function(m){
     
   }
   #Plot 2: the model residuals vs the fitted values
-  plot(m$mu.hat,resid,main='model residuals vs fitted values',xlab='mu',ylab='residulas')
+  plot(m$mu.hat,resid,main='Model Residuals vs Fitted Values',xlab='mu',ylab='residulas')
   
   #Plot 3: qqplot of the residuals
-  qqnorm(resid)
+  qqnorm(resid,main="QQPlot of Residuals")
   
   #list containing the upperbound, lowerbound and x values
   list2<-list(ll=lowerbound,ul=upperbound,x=x)
   invisible(list2)
-  
-  
 }
 
-a<-pspline(x,y)
 
