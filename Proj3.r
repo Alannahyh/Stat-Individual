@@ -1,10 +1,16 @@
 #Alannah Hounat S2434943
+#github:https://github.com/Alannahyh/Stat-Individual
 
 #OVERVIEW
 #"Smoothing with basis expansions and penalties"
-#P-Splines are regression splines used to smooth data. This is done by fitting
-#them by least-squares(b.hat) and a roughness penalty.
-#In this code we will be:
+#P-Splines are regression splines used to smooth data. This is done by 
+#approximating a basis expansion. By the use of basis functions a linear model
+#is created. Although, this can be subjected to over-fitting and thus an optimal 
+#smoothing penalty is chosen by GCV. This ensure the line fit will not be too 
+#"straight" or too "curvy"/"eratic". All variables are described below as they
+#are needed.
+#This code will make use of QR decomposition to ensure some level of efficiency
+#and perform the following tasks:
 #-> Smoothing data x,y with generalised cross validation
 # smoothing parameter selection using the pspline function
 #-> Reporting details of the model fit using the print.pspline function
@@ -133,7 +139,7 @@ get.gcv <- function (y,X,sp,D,bord,pord,qrx,lambda,U){
   #how well data fits regression model
   r_sq<-1-((n-1)*sig)/sum.a
   
-  #list of values to call in later functions using m$
+  #list of class pspline containing important objects from the function
   alist<-list(b.hat=b.hat,mu.hat=mu.hat,gcv=gcv,edf=trA,sig=sig,r_sq=r_sq,k=p,res=res,
        bord=bord,pord=pord,X=X,V=V,sp=sp,stan_error=stan_error,knots=knots)
   class(alist)<-"pspline"
