@@ -165,7 +165,7 @@ print.pspline<- function(m){
 #INPUT:m<- model fit ,x<- new x values,se<-standard error
 #OUTPUT:if se==TRUE: list of predicted y values and corresponding standard errors
 #PURPOSE:makes predictions for the smooth fit using new_x
-predict.pspline<- function(m,x,se=TRUE){
+predict.pspline<- function(m,x,se){
 
   dk <- diff(range(x))/(m$k-m$bord) ## knot spacing
   knots <- seq(min(x)-dk*m$bord,by=dk,length=m$k+m$bord+1)
