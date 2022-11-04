@@ -25,7 +25,7 @@
 #sig<-residual variance
 #all of which is used to find gcv<-generalized cross validation and then
 #find the optimal gcv score
-pspline<-function(x,y,k=20,logsp=c(-5,5),bord=3,pord=2,ngrid=100) {
+pspline<-function(x,y,k,logsp,bord,pord,ngrid) {
   
   #sequence of values for smoothing parameter
   lsp=seq(logsp[1],logsp[2],length=ngrid)
